@@ -8,6 +8,15 @@ type EventsData struct {
 	Subscribes map[string][]string `json:"subscribes"`
 }
 
+var eventsRepo *EventsData
+
+func EventRepository() *EventsData {
+	if eventsRepo == nil {
+		// TODO: init eventsRepo
+	}
+	return eventsRepo
+}
+
 func (ed EventsData) FindEvent(eventName string) (Event, bool) {
 	if event, got := ed.Events[eventName]; got {
 		return event, got
@@ -43,13 +52,13 @@ func (ed EventsData) Trigger(item config.Item) {
 }
 
 type Listener struct {
-	SyncItemName string   `json:"`
+	SyncItemName string   `json:"item_name"`
 	EventNames   []string `json:"event_names"`
 }
 
 func (l Listener) Trigger() {
 	for _, eventName := range l.EventNames {
-		if event, ok := ed.FindEvent(eventName); ok {
+		if event, ok := EventRepository().FindEvent(eventName); ok {
 			event.Run()
 		}
 	}
@@ -58,6 +67,10 @@ func (l Listener) Trigger() {
 type Event struct {
 	Job  Job    `json:"job"`
 	Name string `json:"name"`
+}
+
+func (e Event) Run() {
+	// TODO:: run job
 }
 
 type Job interface {

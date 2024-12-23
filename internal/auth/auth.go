@@ -64,16 +64,19 @@ func (kp *KeyPair) Decrypt(ciphertext []byte) ([]byte, error) {
 }
 
 func (kp *KeyPair) Encrypt(plaintext []byte) ([]byte, error) {
-	block, _ := pem.Decode([]byte(kp.PublicKey))
+	block, rest := pem.Decode([]byte(kp.PublicKey))
 	if block == nil || block.Type != "PUBLIC KEY" {
 		return nil, fmt.Errorf("wrong format for public key")
 	}
+	if len(rest) > 0 {
+		return nil, fmt.Errorf("wrong format for public key")
+	}
 
-	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
 
 	hash := sha256.New()
-	return rsa.EncryptOAEP(hash, rand.Reader, publicKey.(*rsa.PublicKey), plaintext, nil)
+	return rsa.EncryptOAEP(hash, rand.Reader, publicKey, plaintext, nil)
 }
