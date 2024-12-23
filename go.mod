@@ -5,6 +5,7 @@ go 1.22.2
 require (
 	github.com/rivo/tview v0.0.0-20241103174730-c76f7879f592
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/mod v0.8.0
 )
 
 require (
