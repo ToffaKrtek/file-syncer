@@ -30,12 +30,15 @@ func Auth() *AuthData {
 
 func loadAuthData() error {
 	if _, err := os.Stat(authDataFile); os.IsNotExist(err) {
-		authLoaded = &AuthData{}
+		authLoaded = &AuthData{
+			Keys:        make(map[string]KeyPair),
+			Connections: make(map[string]Connection),
+		}
 		// data, err := json.MarshalIndent(authDataDefault, "", "  ")
 		// if err != nil {
 		//   return err
 		// }
-		if err := saveAuthData(); err != nil {
+		if _, err := authLoaded.NewKey("default"); err != nil {
 			return err
 		}
 	}
