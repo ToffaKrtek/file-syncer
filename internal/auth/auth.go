@@ -23,9 +23,30 @@ var (
 
 func Auth() *AuthData {
 	if authLoaded == nil {
-		// TODO:: make authLoaded
+		loadAuthData()
 	}
 	return authLoaded
+}
+
+func loadAuthData() error {
+	if _, err := os.Stat(authDataFile); os.IsNotExist(err) {
+		authLoaded = &AuthData{}
+		// data, err := json.MarshalIndent(authDataDefault, "", "  ")
+		// if err != nil {
+		//   return err
+		// }
+		if err := saveAuthData(); err != nil {
+			return err
+		}
+	}
+	data, err := os.ReadFile(authDataFile)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &authLoaded); err != nil {
+		return err
+	}
+	return nil
 }
 
 func saveAuthData() error {
