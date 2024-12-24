@@ -5,13 +5,66 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"os"
 )
 
 type AuthData struct {
 	Keys        map[string]KeyPair    `json:"keys"`
 	Connections map[string]Connection `json:"connections"`
+}
+
+var (
+	authDataFile = "./authdata.json"
+	authLoaded   *AuthData
+)
+
+func Auth() *AuthData {
+	if authLoaded == nil {
+		// TODO:: make authLoaded
+	}
+	return authLoaded
+}
+
+func saveAuthData() error {
+	data, err := json.Marshal(authLoaded)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(authDataFile, data, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *AuthData) NewKey(name string) (*KeyPair, error) {
+	newKeyPair, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+	return newKeyPair, addKey(name, newKeyPair)
+}
+
+func addKey(name string, key *KeyPair) error {
+	authLoaded.Keys[name] = *key
+	return saveAuthData()
+}
+
+func (a *AuthData) DeleteKey(name string) error {
+	delete(a.Keys, name)
+	return saveAuthData()
+}
+
+func (a *AuthData) AddConnection(host string, publicKey rsa.PublicKey) error {
+	a.Connections[host] = Connection{PublicKey: publicKey, Host: host}
+	return saveAuthData()
+}
+
+func (a *AuthData) DeleteConnection(host string) error {
+	delete(a.Connections, host)
+	return saveAuthData()
 }
 
 type Connection struct {
