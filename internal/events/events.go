@@ -8,13 +8,20 @@ type EventsData struct {
 	Subscribes map[string][]string `json:"subscribes"`
 }
 
-var eventsRepo *EventsData
+var (
+	eventsRepoFile = "./eventsRepo.json"
+	eventsRepo     *EventsData
+)
 
 func EventRepository() *EventsData {
 	if eventsRepo == nil {
 		// TODO: init eventsRepo
 	}
 	return eventsRepo
+}
+
+func loadEventRepo() error {
+	return nil
 }
 
 func (ed EventsData) FindEvent(eventName string) (Event, bool) {

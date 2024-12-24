@@ -9,17 +9,32 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+
+	"github.com/ToffaKrtek/file-syncer/internal/hash"
+	"github.com/joho/godotenv"
 )
+
+var (
+	authEncryptionKey []byte
+	authDataFile      = "./authdata.json"
+	authLoaded        *AuthData
+)
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		panic("Ошибка парсинга .env-файла")
+	}
+
+	authEncryptionKey = []byte(os.Getenv("AUTH_ENCRYPT_KEY"))
+	if len(authEncryptionKey) != 32 {
+		panic("AUTH_ENCRYPT_KEY должен быть длинной 32 байта для AES-256")
+	}
+}
 
 type AuthData struct {
 	Keys        map[string]KeyPair    `json:"keys"`
 	Connections map[string]Connection `json:"connections"`
 }
-
-var (
-	authDataFile = "./authdata.json"
-	authLoaded   *AuthData
-)
 
 func Auth() *AuthData {
 	if authLoaded == nil {
@@ -46,7 +61,11 @@ func loadAuthData() error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &authLoaded); err != nil {
+	decryptedData, err := hash.Decrypt(data, authEncryptionKey)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(decryptedData, &authLoaded); err != nil {
 		return err
 	}
 	return nil
@@ -57,7 +76,11 @@ func saveAuthData() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(authDataFile, data, 0644); err != nil {
+	encryptedData, err := hash.Encrypt(data, authEncryptionKey)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(authDataFile, encryptedData, 0644); err != nil {
 		return err
 	}
 	return nil
