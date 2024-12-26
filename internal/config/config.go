@@ -1,10 +1,13 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
 	"strconv"
+	"sync"
 	"time"
 
-	"github.com/ToffaKrtek/file-syncer/hash"
+	"github.com/ToffaKrtek/file-syncer/internal/hash"
 )
 
 type conf struct {
@@ -14,13 +17,46 @@ type conf struct {
 	SyncItems   []SyncItem              `json:"sync_items"`
 }
 
-var configData *conf
+var (
+	configFile = "./config.json"
+	configData *conf
+	mu         sync.Mutex
+)
 
-func Config() *conf {
+func configRepository() *conf {
+	mu.Lock()
+	defer mu.Unlock()
 	if configData == nil {
-		// TODO:: init
+		var err error
+		_, err = loadConfig()
+		if err != nil {
+			panic("Ошибка загрузки конфигурации")
+		}
 	}
 	return configData
+}
+
+func loadConfig() (*conf, error) {
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		configData = &conf{
+			Connections: make(map[string]ServerConfig),
+			Server:      ServerConfig{},
+			TgToken:     "", // TODO:: get from env package
+			SyncItems:   []SyncItem{},
+		}
+		saveConfig(configData)
+	}
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, configData); err != nil {
+		return nil, err
+	}
+	return configData, nil
+}
+
+func saveConfig(*conf) {
 }
 
 func (c conf) SetConnection(sc *ServerConfig) {
@@ -38,6 +74,10 @@ type ServerConfig struct {
 	IpAddress string `json:"ip_address"`
 	Name      string `json:"name"`
 	Token     string `json:"token"`
+}
+
+func NewServer(ip string, name string, token string) *ServerConfig {
+	return &ServerConfig{ip, name, token}
 }
 
 type SyncItem struct {
