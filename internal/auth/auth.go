@@ -21,6 +21,7 @@ var (
 )
 
 func init() {
+	// TODO:: env to package
 	if err := godotenv.Load(); err != nil {
 		panic("Ошибка парсинга .env-файла")
 	}

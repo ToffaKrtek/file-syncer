@@ -1,8 +1,14 @@
 package events
 
-import "github.com/ToffaKrtek/file-syncer/internal/config"
+import (
+	"encoding/json"
+	"os"
+	"sync"
 
-type EventsData struct {
+	"github.com/ToffaKrtek/file-syncer/internal/config"
+)
+
+type eventsData struct {
 	Events     map[string]Event    `json:"events"`
 	Listeners  map[string]Listener `json:"listeners"`
 	Subscribes map[string][]string `json:"subscribes"`
@@ -10,48 +16,96 @@ type EventsData struct {
 
 var (
 	eventsRepoFile = "./eventsRepo.json"
-	eventsRepo     *EventsData
+	eData          *eventsData
+	locked         int
+	mu             sync.Mutex
 )
 
-func EventRepository() *EventsData {
-	if eventsRepo == nil {
-		// TODO: init eventsRepo
+func eventRepository() *eventsData {
+	mu.Lock()
+	defer mu.Unlock()
+	if eData == nil {
+		var err error
+		_, err = loadEventRepo()
+		if err != nil {
+			panic("Ошибка загрузки репозитория событий")
+		}
 	}
-	return eventsRepo
+	locked++
+	return eData
 }
 
-func loadEventRepo() error {
+func closeRepo() {
+	mu.Lock()
+	defer mu.Unlock()
+	locked--
+	if locked == 0 {
+		eData = nil
+	}
+}
+
+func loadEventRepo() (*eventsData, error) {
+	if _, err := os.Stat(eventsRepoFile); os.IsNotExist(err) {
+		edata := &eventsData{
+			Events:     make(map[string]Event),
+			Listeners:  make(map[string]Listener),
+			Subscribes: make(map[string][]string),
+		}
+		saveEventRepo(edata)
+	}
+	data, err := os.ReadFile(eventsRepoFile)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, eData); err != nil {
+		return nil, err
+	}
+	return eData, nil
+}
+
+func saveEventRepo(edata *eventsData) error {
+	data, err := json.MarshalIndent(edata, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(eventsRepoFile, data, 0644); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (ed EventsData) FindEvent(eventName string) (Event, bool) {
-	if event, got := ed.Events[eventName]; got {
+func FindEvent(eventName string) (Event, bool) {
+	defer closeRepo()
+	if event, got := eventRepository().Events[eventName]; got {
 		return event, got
 	}
 	return Event{}, false
 }
 
 // TODO::
-// func (ed EventsData) AddListener(syncItemName string, eventNames []string) {}
+// func (ed eventsData) AddListener(syncItemName string, eventNames []string) {}
 
-func (ed EventsData) GetListeners(itemName string) ([]string, bool) {
-	if listeners, got := ed.Subscribes[itemName]; got {
+func GetListeners(itemName string) ([]string, bool) {
+	defer closeRepo()
+	if listeners, got := eventRepository().Subscribes[itemName]; got {
 		return listeners, got
 	}
 	return []string{}, false
 }
 
-func (ed EventsData) FindListener(listenerName string) (Listener, bool) {
-	if listener, got := ed.Listeners[listenerName]; got {
+func FindListener(listenerName string) (Listener, bool) {
+	defer closeRepo()
+	if listener, got := eventRepository().Listeners[listenerName]; got {
 		return listener, got
 	}
 	return Listener{}, false
 }
 
-func (ed EventsData) Trigger(item config.Item) {
-	if listeners, got := ed.GetListeners(item.Name); got {
+func Trigger(item config.Item) {
+	defer closeRepo()
+	if listeners, got := GetListeners(item.Name); got {
 		for _, listenerName := range listeners {
-			if listener, ok := ed.FindListener(listenerName); ok {
+			if listener, ok := FindListener(listenerName); ok {
 				listener.Trigger()
 			}
 		}
@@ -65,7 +119,7 @@ type Listener struct {
 
 func (l Listener) Trigger() {
 	for _, eventName := range l.EventNames {
-		if event, ok := EventRepository().FindEvent(eventName); ok {
+		if event, ok := FindEvent(eventName); ok {
 			event.Run()
 		}
 	}
